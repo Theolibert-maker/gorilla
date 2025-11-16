@@ -60,14 +60,14 @@ rendu autonome (traînée + sprite de banane courbée).
 * **`draw(surface)`** — Commence par reconstituer la traînée à l'aide de disques de plus en plus sombres (l'intensité verte est
   réduite proportionnellement à l'indice du point et ensuite clampée pour éviter l'erreur `ValueError`). Le cœur du rendu repose
   désormais sur un sprite de banane pré-rendu :
-  * `_get_banana_surface()` génère une surface transparente 90×70 px ne contenant que la banane.
-  * La silhouette utilise un arc central (spine) et deux normales opposées pour calculer les bords externe/interne, ce qui crée
-    un fruit nettement incurvé. Les normales sont désormais écartées d'une vingtaine de pixels en moyenne (contre ~14
-    précédemment) afin d'épaissir la banane et répondre au retour « trop fine ».
-  * Un cercle supplémentaire affine la tête (le « bout » de la banane) sans recolorer en brun, conformément aux retours
-    utilisateurs, et adopte un rayon légèrement supérieur pour préserver les proportions après épaississement.
-  * Des bandes de lumière et d'ombre, elles aussi élargies (trace 6-7 px), suivent respectivement la face interne et externe
-    pour simuler du volume sans laisser apparaître de liseré sombre.
+  * `_get_banana_surface()` fabrique une surface transparente 130×90 px inspirée d'un fruit illustré : épaisseur importante, arc
+    prononcé, extrémité verte et pointe brune.
+  * La silhouette utilise toujours un arc central (spine) mais le pas angulaire plus serré (3°) et un calcul de `thickness`
+    dépendant à la fois de la courbure et d'un `taper` donnent un « ventre » généreux côté tige et une pointe affinée.
+  * La tige verte est dessinée via une ellipse dédiée, la tête brune par un disque partiellement décalé ; des taches (freckles)
+    ponctuent ensuite la peau pour rappeler la référence fournie.
+  * Trois bandes superposées (highlight crème, ombre douce et liseré brun) suivent la courbure afin de simuler la lumière sur
+    les faces interne/externe tout en conservant un contour net.
   À chaque frame, la surface est récupérée, tournée (`pygame.transform.rotozoom`) selon `self.rotation` pour donner
   l'impression qu'elle vrille en plein vol, puis `blit`ée au centre du projectile.
 

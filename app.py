@@ -177,19 +177,26 @@ class Projectile:
     @classmethod
     def _get_banana_surface(cls) -> pygame.Surface:
         if cls._banana_surface is None:
-            surf = pygame.Surface((90, 70), pygame.SRCALPHA)
-            base_color = pygame.Color(253, 224, 98)
-            highlight = pygame.Color(255, 250, 212)
-            soft_shadow = pygame.Color(214, 177, 96)
+            surf = pygame.Surface((130, 90), pygame.SRCALPHA)
+            base_color = pygame.Color(252, 226, 92)
+            highlight = pygame.Color(255, 248, 186)
+            soft_shadow = pygame.Color(214, 168, 78)
+            rim_shadow = pygame.Color(198, 150, 60)
+            freckles = pygame.Color(209, 157, 63)
+            stem_green = pygame.Color(178, 206, 72)
+            tip_brown = pygame.Color(124, 83, 40)
 
-            spine_center = pygame.Vector2(42, 40)
-            spine_radius = 30
+            spine_center = pygame.Vector2(52, 50)
+            spine_radius = 40
             outer_points: List[Tuple[int, int]] = []
             inner_points: List[Tuple[int, int]] = []
-            for deg in range(-115, 75, 4):
+            for deg in range(-120, 70, 3):
                 rad = math.radians(deg)
                 spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * spine_radius
-                thickness = 20 + 7 * math.sin(math.radians(deg + 40))
+                thickness_base = 24
+                arc_factor = (math.sin(math.radians(deg + 30)) + 1) / 2
+                taper = 1.0 - (deg + 120) / 190  # 1 near queue, 0 near tip
+                thickness = thickness_base + 13 * arc_factor + 6 * (taper**2)
                 normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
                 outer = spine_point + normal * (thickness / 2)
                 inner = spine_point - normal * (thickness / 2)
@@ -198,26 +205,49 @@ class Projectile:
             banana_shape = outer_points + inner_points[::-1]
             pygame.draw.polygon(surf, base_color, banana_shape)
 
-            tip_center = spine_center + pygame.Vector2(math.cos(math.radians(70)), math.sin(math.radians(70))) * (spine_radius + 4)
-            pygame.draw.circle(surf, base_color, (int(tip_center.x), int(tip_center.y)), 8)
+            stem_rect = pygame.Rect(0, 0, 32, 26)
+            stem_rect.center = (32, 58)
+            pygame.draw.ellipse(surf, stem_green, stem_rect)
+            pygame.draw.ellipse(surf, rim_shadow, stem_rect.inflate(-8, -8))
+
+            tip_center = pygame.Vector2(110, 40)
+            pygame.draw.circle(surf, base_color, (int(tip_center.x), int(tip_center.y)), 12)
+            pygame.draw.circle(surf, tip_brown, (int(tip_center.x + 6), int(tip_center.y - 1)), 6)
 
             highlight_path: List[Tuple[int, int]] = []
-            for deg in range(-95, 55, 6):
+            for deg in range(-105, 45, 5):
                 rad = math.radians(deg)
-                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius - 4)
+                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius - 5)
                 normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
-                inner = spine_point - normal * 6 + pygame.Vector2(0, -4)
+                inner = spine_point - normal * 8 + pygame.Vector2(-2, -6)
                 highlight_path.append((int(inner.x), int(inner.y)))
-            pygame.draw.lines(surf, highlight, False, highlight_path, 6)
+            pygame.draw.lines(surf, highlight, False, highlight_path, 8)
 
             shadow_path: List[Tuple[int, int]] = []
-            for deg in range(-110, 65, 5):
+            for deg in range(-118, 65, 4):
                 rad = math.radians(deg)
-                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius - 2)
+                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius - 1)
                 normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
-                outer = spine_point + normal * 8 + pygame.Vector2(-2, 4)
+                outer = spine_point + normal * 9 + pygame.Vector2(-4, 6)
                 shadow_path.append((int(outer.x), int(outer.y)))
-            pygame.draw.lines(surf, soft_shadow, False, shadow_path, 7)
+            pygame.draw.lines(surf, soft_shadow, False, shadow_path, 9)
+
+            rim_path: List[Tuple[int, int]] = []
+            for deg in range(-120, 70, 3):
+                rad = math.radians(deg)
+                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius + 3)
+                normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
+                rim = spine_point + normal * 18
+                rim_path.append((int(rim.x), int(rim.y)))
+            pygame.draw.lines(surf, rim_shadow, False, rim_path, 2)
+
+            for _ in range(12):
+                angle = random.uniform(-0.9, 0.7)
+                along = random.uniform(0.1, 0.9)
+                center = spine_center + pygame.Vector2(math.cos(angle), math.sin(angle)) * (spine_radius * along)
+                offset = pygame.Vector2(random.uniform(-4, 4), random.uniform(-2, 2))
+                pygame.draw.circle(surf, freckles, (int(center.x + offset.x), int(center.y + offset.y)), 2)
+
             cls._banana_surface = surf
         return cls._banana_surface
 
