@@ -177,61 +177,51 @@ class Projectile:
     @classmethod
     def _get_banana_surface(cls) -> pygame.Surface:
         if cls._banana_surface is None:
-            surf = pygame.Surface((128, 72), pygame.SRCALPHA)
-            base_color = pygame.Color(248, 218, 96)
-            highlight_color = pygame.Color(255, 246, 204)
-            shadow_color = pygame.Color(204, 160, 62)
-            outline_color = pygame.Color(178, 132, 57)
-            stem_color = pygame.Color(166, 196, 92)
-            tip_color = pygame.Color(130, 93, 54)
+            surf = pygame.Surface((112, 64), pygame.SRCALPHA)
+            base_color = pygame.Color(247, 214, 92)
+            highlight_color = pygame.Color(255, 241, 188)
+            shadow_color = pygame.Color(202, 158, 70)
+            outline_color = pygame.Color(163, 120, 52)
 
-            spine_center = pygame.Vector2(58, 40)
-            spine_radius = 46
+            spine_center = pygame.Vector2(50, 36)
+            spine_radius = 44
             outer_points: List[Tuple[int, int]] = []
             inner_points: List[Tuple[int, int]] = []
-            degrees = list(range(-120, 66, 3))
-            total_span = max(1, degrees[-1] - degrees[0])
-            for deg in degrees:
+            degrees = list(range(-118, 70, 3))
+            total_span = max(1, len(degrees) - 1)
+            for idx, deg in enumerate(degrees):
                 rad = math.radians(deg)
                 spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * spine_radius
-                progress = (deg - degrees[0]) / total_span
-                thickness = 28 - 10 * progress + 3 * math.sin(math.radians(deg + 30))
+                progress = idx / total_span
+                thickness = 22 - 9 * progress + 2.2 * math.sin(math.radians(deg + 45))
                 normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
                 outer = spine_point + normal * (thickness / 2)
-                inner = spine_point - normal * (thickness / 2 - 2)
+                inner = spine_point - normal * (thickness / 2 - 1.5)
                 outer_points.append((int(outer.x), int(outer.y)))
                 inner_points.append((int(inner.x), int(inner.y)))
+
             banana_shape = outer_points + inner_points[::-1]
             pygame.draw.polygon(surf, base_color, banana_shape)
-            pygame.draw.lines(surf, outline_color, False, outer_points, 3)
-            pygame.draw.lines(surf, outline_color, False, inner_points, 2)
+            pygame.draw.aalines(surf, outline_color, False, outer_points)
+            pygame.draw.aalines(surf, outline_color, False, inner_points)
 
             highlight_pts: List[Tuple[int, int]] = []
-            for deg in range(-110, 40, 4):
+            for deg in range(-112, 54, 4):
                 rad = math.radians(deg)
-                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius - 2)
+                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius - 3)
                 normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
-                point = spine_point - normal * 6
+                point = spine_point - normal * 4
                 highlight_pts.append((int(point.x), int(point.y)))
-            pygame.draw.lines(surf, highlight_color, False, highlight_pts, 4)
+            pygame.draw.aalines(surf, highlight_color, False, highlight_pts)
 
             shadow_pts: List[Tuple[int, int]] = []
-            for deg in range(-120, 66, 4):
+            for deg in range(-118, 66, 4):
                 rad = math.radians(deg)
-                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius + 3)
+                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius + 2)
                 normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
-                point = spine_point + normal * 7
+                point = spine_point + normal * 6
                 shadow_pts.append((int(point.x), int(point.y)))
-            pygame.draw.lines(surf, shadow_color, False, shadow_pts, 5)
-
-            stem_rect = pygame.Rect(0, 0, 20, 18)
-            stem_rect.center = inner_points[0]
-            pygame.draw.ellipse(surf, stem_color, stem_rect)
-            pygame.draw.ellipse(surf, outline_color, stem_rect, 2)
-
-            tip_center = outer_points[-1]
-            pygame.draw.circle(surf, tip_color, tip_center, 6)
-            pygame.draw.circle(surf, outline_color, tip_center, 6, 1)
+            pygame.draw.aalines(surf, shadow_color, False, shadow_pts)
 
             cls._banana_surface = surf
         return cls._banana_surface

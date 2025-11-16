@@ -59,15 +59,13 @@ rendu autonome (traînée + sprite de banane courbée).
   préserver la mémoire et le temps de dessin.
 * **`draw(surface)`** — Commence par reconstituer la traînée à l'aide de disques de plus en plus sombres (l'intensité verte est
   réduite proportionnellement à l'indice du point et ensuite clampée pour éviter l'erreur `ValueError`). Le cœur du rendu repose
-  sur un sprite de banane pré-rendu très proche du premier prototype validé en séance :
-  * `_get_banana_surface()` fabrique une surface transparente compacte (128×72 px) et trace une silhouette courbée en reliant
-    deux rubans de points (face externe / face interne) échantillonnés sur un arc de cercle de 46 px de rayon. Cette géométrie,
-    moins sophistiquée que les itérations ultérieures, reste parfaitement lisible en plein écran.
-  * L'épaisseur varie simplement selon la progression le long de l'arc (`progress`) à laquelle on ajoute un léger biais sinusoidal
-    pour épaissir la base et affiner la pointe sans cassure abrupte.
-  * La finition est volontairement minimaliste : un ovale vert sert de tige, un petit disque brun évoque la pointe, un liseré foncé
-    souligne les bords et une bande claire parcourt le dessus. Le visuel correspond ainsi au "premier modèle" demandé par
-    l'utilisateur, sans les ornements additionnels apparus dans les itérations suivantes.
+  désormais sur un sprite identique à la toute première banane validée par l'utilisateur :
+  * `_get_banana_surface()` fabrique une surface compacte (112×64 px) et trace deux arcs (face externe / face interne) issus du
+    même cercle imaginaire. Leur léger décalage suffit à former un croissant lisible sans artifice.
+  * L'épaisseur varie en fonction de `progress` (position le long de l'arc) et d'une oscillation sinusoïdale qui épaissit
+    naturellement la base tout en affinant la pointe.
+  * Aucun embout coloré ni tige ajoutée : on ne conserve qu'un liseré clair sur le dessus et une bande ombrée sous le fruit pour
+    rappeler la patine vintage du premier prototype.
   À chaque frame, la surface est récupérée, tournée (`pygame.transform.rotozoom`) selon `self.rotation` pour donner
   l'impression qu'elle vrille en plein vol, puis `blit`ée au centre du projectile.
 
