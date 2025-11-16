@@ -177,47 +177,108 @@ class Projectile:
     @classmethod
     def _get_banana_surface(cls) -> pygame.Surface:
         if cls._banana_surface is None:
-            surf = pygame.Surface((80, 60), pygame.SRCALPHA)
-            base_color = pygame.Color(252, 222, 92)
-            shadow = pygame.Color(186, 142, 52)
-            highlight = pygame.Color(255, 248, 196)
+            surf = pygame.Surface((90, 70), pygame.SRCALPHA)
+            base_color = pygame.Color(253, 224, 98)
+            highlight = pygame.Color(255, 250, 212)
+            soft_shadow = pygame.Color(214, 177, 96)
 
-            center = pygame.Vector2(34, 40)
-            outer_radius = 34
-            inner_radius = 18
+            spine_center = pygame.Vector2(42, 40)
+            spine_radius = 30
             outer_points: List[Tuple[int, int]] = []
             inner_points: List[Tuple[int, int]] = []
-            for deg in range(-125, 55, 5):
+            for deg in range(-115, 75, 4):
                 rad = math.radians(deg)
-                point = center + pygame.Vector2(math.cos(rad), math.sin(rad)) * outer_radius
-                outer_points.append((int(point.x), int(point.y)))
-            for deg in range(55, -125, -5):
-                rad = math.radians(deg)
-                offset = pygame.Vector2(math.cos(rad), math.sin(rad)) * inner_radius
-                point = center + offset + pygame.Vector2(4, -4)
-                inner_points.append((int(point.x), int(point.y)))
-            banana_shape = outer_points + inner_points
+                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * spine_radius
+                thickness = 14 + 5 * math.sin(math.radians(deg + 40))
+                normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
+                outer = spine_point + normal * (thickness / 2)
+                inner = spine_point - normal * (thickness / 2)
+                outer_points.append((int(outer.x), int(outer.y)))
+                inner_points.append((int(inner.x), int(inner.y)))
+            banana_shape = outer_points + inner_points[::-1]
             pygame.draw.polygon(surf, base_color, banana_shape)
 
-            highlight_points: List[Tuple[int, int]] = []
-            for deg in range(-110, 40, 6):
-                rad = math.radians(deg)
-                point = center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (inner_radius - 3)
-                point += pygame.Vector2(0, -8)
-                highlight_points.append((int(point.x), int(point.y)))
-            pygame.draw.lines(surf, highlight, False, highlight_points, 5)
+            tip_center = spine_center + pygame.Vector2(math.cos(math.radians(70)), math.sin(math.radians(70))) * (spine_radius + 4)
+            pygame.draw.circle(surf, base_color, (int(tip_center.x), int(tip_center.y)), 6)
 
-            shadow_band: List[Tuple[int, int]] = []
-            for deg in range(-120, 50, 5):
+            highlight_path: List[Tuple[int, int]] = []
+            for deg in range(-95, 55, 6):
                 rad = math.radians(deg)
-                offset = pygame.Vector2(math.cos(rad), math.sin(rad)) * (outer_radius - 6)
-                offset += pygame.Vector2(-2, 4)
-                point = center + offset
-                shadow_band.append((int(point.x), int(point.y)))
-            soft_shadow = pygame.Color(214, 177, 96)
-            pygame.draw.lines(surf, soft_shadow, False, shadow_band, 4)
+                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius - 4)
+                normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
+                inner = spine_point - normal * 5 + pygame.Vector2(0, -4)
+                highlight_path.append((int(inner.x), int(inner.y)))
+            pygame.draw.lines(surf, highlight, False, highlight_path, 5)
+
+            shadow_path: List[Tuple[int, int]] = []
+            for deg in range(-110, 65, 5):
+                rad = math.radians(deg)
+                spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius - 2)
+                normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
+                outer = spine_point + normal * 6 + pygame.Vector2(-2, 4)
+                shadow_path.append((int(outer.x), int(outer.y)))
+            pygame.draw.lines(surf, soft_shadow, False, shadow_path, 6)
             cls._banana_surface = surf
         return cls._banana_surface
+
+
+class Explosion:
+    """Effet visuel pour les impacts."""
+
+    def __init__(self, position: Tuple[int, int]):
+        self.pos = pygame.Vector2(position)
+        self.time = 0.0
+        self.duration = 0.7
+        self.particles = []
+        for _ in range(18):
+            angle = random.uniform(0, math.tau)
+            speed = random.uniform(90, 220)
+            velocity = pygame.Vector2(math.cos(angle), math.sin(angle)) * speed
+            particle = {
+                "pos": self.pos.copy(),
+                "vel": velocity,
+                "radius": random.uniform(2.5, 4.5),
+                "grow": random.uniform(12, 20),
+                "color": pygame.Color(255, random.randint(140, 210), random.randint(40, 120)),
+            }
+            self.particles.append(particle)
+
+    def update(self, dt: float) -> None:
+        self.time += dt
+        for particle in self.particles:
+            particle["pos"] += particle["vel"] * dt
+            particle["vel"] *= 0.9
+            particle["radius"] += particle["grow"] * dt
+
+    def alive(self) -> bool:
+        return self.time < self.duration
+
+    def draw(self, surface: pygame.Surface) -> None:
+        progress = min(1.0, self.time / self.duration)
+        fade = 1.0 - progress
+        glow_radius = int(EXPLOSION_RADIUS * (0.8 + progress * 1.2))
+        glow_surface = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
+        center = (glow_radius, glow_radius)
+        pygame.draw.circle(glow_surface, (255, 226, 140, int(210 * fade)), center, glow_radius)
+        pygame.draw.circle(glow_surface, (255, 140, 70, int(230 * fade)), center, int(glow_radius * 0.45))
+        surface.blit(glow_surface, glow_surface.get_rect(center=(int(self.pos.x), int(self.pos.y))))
+
+        for particle in self.particles:
+            color = particle["color"]
+            alpha = int(255 * fade)
+            if alpha <= 0:
+                continue
+            spark_surface = pygame.Surface((50, 50), pygame.SRCALPHA)
+            radius = max(1, int(particle["radius"] * fade))
+            pygame.draw.circle(
+                spark_surface,
+                (color.r, color.g, color.b, alpha),
+                (25, 25),
+                radius,
+            )
+            pos = particle["pos"]
+            rect = spark_surface.get_rect(center=(int(pos.x), int(pos.y)))
+            surface.blit(spark_surface, rect)
 
 
 class Skyline:
@@ -271,6 +332,7 @@ class GorillaGame:
         self.sky_surface = self._build_sky()
         self.skyline = Skyline(SCREEN_WIDTH, SCREEN_HEIGHT)
         self.projectile: Projectile | None = None
+        self.explosions: List[Explosion] = []
         self.current_player = 0
         self.wind_speed = 0.0
         self.round_wins = [0, 0]
@@ -361,6 +423,7 @@ class GorillaGame:
         self.gorillas = self._place_gorillas()
         self.wind_speed = random.uniform(-MAX_WIND, MAX_WIND)
         self.projectile = None
+        self.explosions.clear()
         # alter starting player each round
         self.current_player = 0 if self.current_round % 2 == 1 else 1
         self.update_status(f"Round {self.current_round} - {self.current_player_name()} commence !")
@@ -446,16 +509,22 @@ class GorillaGame:
                 pass
             elif self.skyline.collides((px, py)):
                 self.skyline.carve_explosion((px, py), EXPLOSION_RADIUS)
+                self.spawn_explosion((px, py))
                 self.projectile = None
                 self.switch_turn(f"{self.current_player_name()} a touché un immeuble !")
                 return
             for idx, gorilla in enumerate(self.gorillas):
                 if gorilla.rect.collidepoint(px, py):
+                    self.spawn_explosion((px, py))
                     self.projectile = None
                     loser = idx
                     winner = self.current_player if idx != self.current_player else 1 - self.current_player
                     self.resolve_hit(winner, loser)
                     return
+        for explosion in self.explosions[:]:
+            explosion.update(dt)
+            if not explosion.alive():
+                self.explosions.remove(explosion)
 
     def switch_turn(self, message: str) -> None:
         if self.match_over:
@@ -476,6 +545,9 @@ class GorillaGame:
         else:
             self.current_round += 1
             self.start_round()
+
+    def spawn_explosion(self, position: Tuple[int, int]) -> None:
+        self.explosions.append(Explosion(position))
 
     def save_score(self, winner: str, loser: str) -> None:
         entry = {
@@ -499,6 +571,8 @@ class GorillaGame:
         self.skyline.draw(self.screen)
         for gorilla in self.gorillas:
             gorilla.draw(self.screen)
+        for explosion in self.explosions:
+            explosion.draw(self.screen)
         if self.projectile:
             self.projectile.draw(self.screen)
         self._draw_hud()
