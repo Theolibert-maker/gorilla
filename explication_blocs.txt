@@ -62,10 +62,12 @@ rendu autonome (traînée + sprite de banane courbée).
   désormais sur un sprite de banane pré-rendu :
   * `_get_banana_surface()` génère une surface transparente 90×70 px ne contenant que la banane.
   * La silhouette utilise un arc central (spine) et deux normales opposées pour calculer les bords externe/interne, ce qui crée
-    un fruit nettement incurvé.
+    un fruit nettement incurvé. Les normales sont désormais écartées d'une vingtaine de pixels en moyenne (contre ~14
+    précédemment) afin d'épaissir la banane et répondre au retour « trop fine ».
   * Un cercle supplémentaire affine la tête (le « bout » de la banane) sans recolorer en brun, conformément aux retours
-    utilisateurs.
-  * Des bandes de lumière et d'ombre suivent respectivement la face interne et externe pour simuler du volume.
+    utilisateurs, et adopte un rayon légèrement supérieur pour préserver les proportions après épaississement.
+  * Des bandes de lumière et d'ombre, elles aussi élargies (trace 6-7 px), suivent respectivement la face interne et externe
+    pour simuler du volume sans laisser apparaître de liseré sombre.
   À chaque frame, la surface est récupérée, tournée (`pygame.transform.rotozoom`) selon `self.rotation` pour donner
   l'impression qu'elle vrille en plein vol, puis `blit`ée au centre du projectile.
 

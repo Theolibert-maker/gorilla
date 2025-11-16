@@ -189,7 +189,7 @@ class Projectile:
             for deg in range(-115, 75, 4):
                 rad = math.radians(deg)
                 spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * spine_radius
-                thickness = 14 + 5 * math.sin(math.radians(deg + 40))
+                thickness = 20 + 7 * math.sin(math.radians(deg + 40))
                 normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
                 outer = spine_point + normal * (thickness / 2)
                 inner = spine_point - normal * (thickness / 2)
@@ -199,25 +199,25 @@ class Projectile:
             pygame.draw.polygon(surf, base_color, banana_shape)
 
             tip_center = spine_center + pygame.Vector2(math.cos(math.radians(70)), math.sin(math.radians(70))) * (spine_radius + 4)
-            pygame.draw.circle(surf, base_color, (int(tip_center.x), int(tip_center.y)), 6)
+            pygame.draw.circle(surf, base_color, (int(tip_center.x), int(tip_center.y)), 8)
 
             highlight_path: List[Tuple[int, int]] = []
             for deg in range(-95, 55, 6):
                 rad = math.radians(deg)
                 spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius - 4)
                 normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
-                inner = spine_point - normal * 5 + pygame.Vector2(0, -4)
+                inner = spine_point - normal * 6 + pygame.Vector2(0, -4)
                 highlight_path.append((int(inner.x), int(inner.y)))
-            pygame.draw.lines(surf, highlight, False, highlight_path, 5)
+            pygame.draw.lines(surf, highlight, False, highlight_path, 6)
 
             shadow_path: List[Tuple[int, int]] = []
             for deg in range(-110, 65, 5):
                 rad = math.radians(deg)
                 spine_point = spine_center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (spine_radius - 2)
                 normal = pygame.Vector2(-math.sin(rad), math.cos(rad))
-                outer = spine_point + normal * 6 + pygame.Vector2(-2, 4)
+                outer = spine_point + normal * 8 + pygame.Vector2(-2, 4)
                 shadow_path.append((int(outer.x), int(outer.y)))
-            pygame.draw.lines(surf, soft_shadow, False, shadow_path, 6)
+            pygame.draw.lines(surf, soft_shadow, False, shadow_path, 7)
             cls._banana_surface = surf
         return cls._banana_surface
 
