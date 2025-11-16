@@ -59,17 +59,15 @@ rendu autonome (traînée + sprite de banane courbée).
   préserver la mémoire et le temps de dessin.
 * **`draw(surface)`** — Commence par reconstituer la traînée à l'aide de disques de plus en plus sombres (l'intensité verte est
   réduite proportionnellement à l'indice du point et ensuite clampée pour éviter l'erreur `ValueError`). Le cœur du rendu repose
-  désormais sur un sprite de banane pré-rendu :
-  * `_get_banana_surface()` produit une surface transparente 160×120 px qui encaisse une silhouette beaucoup plus douce et
-    volumineuse. L'arc (spine) couvre près de 180° et définit un chemin d'échantillonnage commun aux faces interne/externe.
-  * Pour chaque angle, l'épaisseur est recalculée à partir du progrès le long de l'arc (`progress`), d'un facteur de courbure
-    (`sin(deg + 40)`) et d'un `taper` élevé à 1.6 pour épaissir encore la base. Le résultat est une banane "pleine" côté tige et
-    affinée côté pointe sans cassure.
-  * La tige verte repose sur une ellipse centrée sur le premier point interne, tandis que la pointe reçoit un disque brun très
-    contenu pour évoquer les fibres naturelles sans baver à l'écran.
-  * Deux bandes suivent la géométrie : un highlight crème projeté vers l'intérieur (-normal) et un ombrage chaud projeté vers
-    l'extérieur (+normal). Un liseré brun foncé accroche la lumière sur la tranche externe pour renforcer le contraste lorsque la
-    banane tourne.
+  sur un sprite de banane pré-rendu très proche du premier prototype validé en séance :
+  * `_get_banana_surface()` fabrique une surface transparente compacte (128×72 px) et trace une silhouette courbée en reliant
+    deux rubans de points (face externe / face interne) échantillonnés sur un arc de cercle de 46 px de rayon. Cette géométrie,
+    moins sophistiquée que les itérations ultérieures, reste parfaitement lisible en plein écran.
+  * L'épaisseur varie simplement selon la progression le long de l'arc (`progress`) à laquelle on ajoute un léger biais sinusoidal
+    pour épaissir la base et affiner la pointe sans cassure abrupte.
+  * La finition est volontairement minimaliste : un ovale vert sert de tige, un petit disque brun évoque la pointe, un liseré foncé
+    souligne les bords et une bande claire parcourt le dessus. Le visuel correspond ainsi au "premier modèle" demandé par
+    l'utilisateur, sans les ornements additionnels apparus dans les itérations suivantes.
   À chaque frame, la surface est récupérée, tournée (`pygame.transform.rotozoom`) selon `self.rotation` pour donner
   l'impression qu'elle vrille en plein vol, puis `blit`ée au centre du projectile.
 
