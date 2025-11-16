@@ -207,16 +207,15 @@ class Projectile:
                 highlight_points.append((int(point.x), int(point.y)))
             pygame.draw.lines(surf, highlight, False, highlight_points, 5)
 
-            pygame.draw.arc(
-                surf,
-                shadow,
-                pygame.Rect(6, 8, 60, 44),
-                math.radians(-140),
-                math.radians(40),
-                6,
-            )
-            pygame.draw.circle(surf, shadow, outer_points[0], 4)
-            pygame.draw.circle(surf, shadow, outer_points[-1], 3)
+            shadow_band: List[Tuple[int, int]] = []
+            for deg in range(-120, 50, 5):
+                rad = math.radians(deg)
+                offset = pygame.Vector2(math.cos(rad), math.sin(rad)) * (outer_radius - 6)
+                offset += pygame.Vector2(-2, 4)
+                point = center + offset
+                shadow_band.append((int(point.x), int(point.y)))
+            soft_shadow = pygame.Color(214, 177, 96)
+            pygame.draw.lines(surf, soft_shadow, False, shadow_band, 4)
             cls._banana_surface = surf
         return cls._banana_surface
 
