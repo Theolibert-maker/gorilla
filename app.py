@@ -1,4 +1,3 @@
-
 """Gorilla 2025 - QBasic Gorillas revisité en pygame."""
 from __future__ import annotations
 
@@ -154,7 +153,6 @@ class GorillaGame:
         self.names_panel = pygame_gui.elements.UIPanel(
             pygame.Rect(20, 15, 360, 90),
             manager=self.manager,
-            starting_layer_height=1,
         )
         pygame_gui.elements.UILabel(
             pygame.Rect(10, 5, 150, 20),
@@ -184,7 +182,7 @@ class GorillaGame:
         )
 
         control_rect = pygame.Rect(20, SCREEN_HEIGHT - 130, SCREEN_WIDTH - 40, 110)
-        self.control_panel = pygame_gui.elements.UIPanel(control_rect, manager=self.manager, starting_layer_height=1)
+        self.control_panel = pygame_gui.elements.UIPanel(control_rect, manager=self.manager)
         pygame_gui.elements.UILabel(
             pygame.Rect(10, 10, 120, 25),
             text="Angle (°)",
