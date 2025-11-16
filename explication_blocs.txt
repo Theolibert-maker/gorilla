@@ -1,185 +1,175 @@
 Mémo technique détaillé sur la structure de `app.py`
 ===================================================
 
-Cette annexe a été pensée comme un chapitre de mémoire décrivant en profondeur l'architecture du jeu Gorilla. Elle suit le
-fichier `app.py` de haut en bas afin d'expliquer non seulement le rôle de chaque bloc mais aussi les motivations
-architecturales, les dépendances et les flux de données. Pour les lecteurs qui défendront ce code, l'objectif est de pouvoir
-retracer chaque décision et d'argumenter la cohérence d'ensemble.
+Ce document accompagne le projet Gorilla comme une note de mémoire. Il explique méthodiquement chaque bloc du fichier
+`app.py`, leurs interactions et les raisons des choix techniques. La lecture suit l'ordre du fichier pour faciliter la
+navigation en soutenance.
+
+0. Vue d'ensemble
+-----------------
+L'application est un jeu 2D écrit avec `pygame` et `pygame_gui`. Elle combine trois couches :
+
+* **Entités graphiques/physiques** — gorilles, projectiles (bananes), explosions et skyline destructible.
+* **Orchestrateur** — la classe `GorillaGame` qui gère les rounds, l'IHM, les entrées et la physique.
+* **Point d'entrée** — `main()` initialisant pygame, l'UI et lançant la boucle principale.
 
 1. Importations, constantes et ressources partagées
 ---------------------------------------------------
-Les premières lignes réunissent les modules standards (`json`, `math`, `random`, `dataclasses`, `datetime`, `pathlib`, `typing`)
-et les bibliothèques tierces `pygame` / `pygame_gui`. Ce découpage révèle déjà trois préoccupations majeures :
+Le fichier commence par les imports standards (`json`, `math`, `random`, `dataclasses`, `datetime`, `pathlib`, `typing`)
+ainsi que `pygame` et `pygame_gui`. Ils se répartissent en trois familles :
 
-1. **Simulation et mathématiques** — `math` fournit les conversions trigonométriques (degrés → radians), tandis que
-   `random` assure la génération procédurale de la skyline et du vent. L'utilisation de `pygame.Vector2` (exposé via
-   `pygame`) permet de raisonner en coordonnées flottantes sans perdre de précision lors de l'intégration.
-2. **Persistance et traçabilité** — `json`, `datetime` et `Path` coordonnent l'écriture de `scores.json`. La date est formatée
-   en ISO 8601 pour simplifier l'archivage et la lecture par des outils externes.
-3. **Annotations et ergonomie** — `dataclasses.dataclass` diminue le bruit syntaxique pour `Gorilla`, tandis que `typing`
-   clarifie les signatures (par exemple `Optional[Projectile]`) et sert de documentation vivante.
+1. **Simulation mathématique** — `math` (sin/cos, radians), `random` (vent, skyline), `pygame.Vector2` (positions flottantes).
+2. **Persistance** — `json`, `datetime`, `Path` pour sérialiser les scores (`scores.json`) avec horodatage ISO 8601.
+3. **Ergonomie du code** — `dataclass` pour déclarer `Gorilla` et `typing` pour annoter `Optional[Projectile]`, etc.
 
-Un bloc de constantes suit immédiatement ces imports. Il fixe les grandeurs physiques (`GRAVITY`, `DRAG_COEFF`, `WIND_MAX`), les
-paramètres de gameplay (`EXPLOSION_RADIUS`, `WIN_ROUNDS`) et l'habillage (`SCREEN_SIZE`, palettes de couleurs, police). Centraliser
-ces valeurs répond à deux exigences :
+Viennent ensuite des constantes globales : taille de fenêtre, gravité (`GRAVITY`), coefficient de frottement (`DRAG_COEFF`),
+vent max (`WIND_MAX`), rayon d'explosion (`EXPLOSION_RADIUS`), nombre de rounds gagnants (`WIN_ROUNDS`), palette de couleurs,
+chemin du fichier de scores, police, etc. Centraliser ces valeurs garantit :
 
-* garantir la cohérence des calculs physiques (tous les projectiles lisent la même gravité) ;
-* faciliter l'expérimentation pédagogique (on peut illustrer l'effet d'un vent plus fort en modifiant un seul nombre).
+* une physique cohérente (tous les projectiles lisent la même gravité) ;
+* une expérimentation rapide (modifier un seul nombre change tout le gameplay) ;
+* la réutilisation par plusieurs classes sans dépendances circulaires.
 
-Enfin, des surfaces et `pygame.font.Font` sont préparées pour être partagés par plusieurs objets, évitant les réinitialisations
-coûteuses à chaque frame.
+Enfin, quelques surfaces (ciel) et polices sont créées une fois pour toutes afin d'éviter des reallocations coûteuses.
 
 2. Classe `Gorilla`
 -------------------
-`Gorilla` est déclarée comme dataclass pour mettre en avant son rôle de conteneur d'état :
+`Gorilla` est une dataclass qui joue le rôle de conteneur d'état pour chaque personnage :
 
-* **Attributs** — `rect` (position et taille sur l'écran), `color` (couleur principale), `direction` (1 vers la droite, -1 vers la
-  gauche). Ce trio suffit pour dessiner un gorille stylisé et déterminer où débute son lancer.
-* **`draw(surface)`** — Composé de primitives `pygame.draw`. Les sous-parties (corps rectangulaire, tête circulaire,
-  yeux, bras orienté) s'appuient toutes sur les coordonnées de `rect`. Cette hiérarchie relative garantit qu'un déplacement de
-  `rect` se répercute sur l'ensemble du personnage sans recalcul manuel.
-* **`throw_position()`** — Retourne un `pygame.Vector2` positionné à l'extrémité du bras (offset horizontal dépendant de
-  `direction`, offset vertical constant pour aligner la banane à hauteur d'épaule). En procédant ainsi, la physique ignore la
-  morphologie du gorille : la classe se contente de fournir un point d'origine réaliste.
+* **Attributs** — `rect` (position/tailles sur l'écran), `color` (dominante visuelle), `direction` (1 vers la droite, -1 vers la
+gauche). Ces trois éléments suffisent pour dessiner et calculer le point de lancer.
+* **`draw(surface)`** — Assemble un sprite stylisé de singe : corps elliptique, ventre clair, tête, yeux, bras, jambes et queue.
+Toutes les coordonnées sont dérivées du `rect`, ce qui garantit la cohérence visuelle lorsque le gorille est repositionné sur
+un immeuble.
+* **`throw_position()`** — Retourne un `pygame.Vector2` situé à l'extrémité du bras lançant. Le décalage horizontal dépend de
+`direction` pour que le bras sorte du bon côté, tandis que le décalage vertical garde la banane au niveau de l'épaule.
 
 3. Classe `Projectile`
 ----------------------
-Le projectile encapsule la dynamique des bananes explosives. Sa responsabilité est double : intégrer la physique et exposer un
-rendu autonome (traînée + disque principal).
+Le projectile encapsule à la fois la simulation physique de la banane et son rendu autonome (traînée + sprite tournant).
 
-* **Initialisation** — Le constructeur reçoit `start_pos`, `angle_deg`, `speed` et `wind`. L'angle est converti en radians,
-  puis projeté en composantes `vel.x = cos(angle) * speed` et `vel.y = -sin(angle) * speed` (signe négatif car l'axe Y
-  croît vers le bas en pixel). Le paramètre `wind` est stocké afin de simuler la vitesse relative air/projectile.
-* **`update(dt)`** — Implémente une intégration d'Euler explicite :
-  1. calcul de l'accélération verticale (`GRAVITY`),
-  2. calcul de l'accélération horizontale issue des frottements : `a_x = DRAG_COEFF * (wind - vel.x)` (plus la banane va vite
-     par rapport à l'air, plus elle est freinée dans la direction opposée),
-  3. mise à jour de `vel` puis de `pos` via `vel * dt`.
-  La méthode enregistre ensuite `pos.copy()` dans `trail_points`. Une fenêtre glissante limite la traînée à ~120 points pour
-  préserver la mémoire et le temps de dessin.
-* **`draw(surface)`** — Commence par reconstituer la traînée à l'aide de disques de plus en plus sombres (l'intensité verte est
-  réduite proportionnellement à l'indice du point et ensuite clampée pour éviter l'erreur `ValueError`). Enfin, la banane est
-  matérialisée par un disque central jaune. Cette séparation renforce la lisibilité de la trajectoire en plein match.
+* **Initialisation** — Reçoit `start_pos`, `angle_deg`, `speed`, `wind`. L'angle est converti en radians, puis la vitesse est
+projetée en composantes : `vel.x = cos(angle) * speed`, `vel.y = -sin(angle) * speed` (axe Y orienté vers le bas dans pygame).
+Le vent est stocké pour calculer la vitesse relative air/projectile. L'objet crée aussi une liste `trail_points` pour
+mémoriser les positions précédentes et gère un angle de rotation `rotation` (avec une vitesse aléatoire `rotation_speed`).
+* **`update(dt)`** — Implémente l'intégration d'Euler :
+  1. accélération verticale constante `GRAVITY` ;
+  2. accélération horizontale issue des frottements de l'air `a_x = DRAG_COEFF * (wind - vel.x)` ;
+  3. mise à jour de `vel` puis `pos` via `vel * dt` ;
+  4. enregistrement de la position dans `trail_points` (liste bornée à ~120 éléments) ;
+  5. incrément de `rotation` selon `rotation_speed` pour donner l'illusion d'une banane qui vrille.
+* **`draw(surface)`** — Deux phases :
+  1. **Traînée** — Chaque point ancien est dessiné avec `pygame.draw.circle`. L'intensité de la couleur décroît selon l'indice et
+     est clampée afin d'éviter l'erreur `ValueError` observée lors des premiers tests.
+  2. **Sprite de banane** — `_get_banana_surface()` construit une surface `52×24 px` seulement la première fois : ellipse
+     principale, deux cercles aux extrémités pour courber les bouts, un ovale clair interne et une légère ombre arciforme.
+     L'ensemble rappelle le tout premier prototype demandé par l'utilisateur. Cette surface est ensuite tournée via
+     `pygame.transform.rotozoom(..., 1.0)` (pas de réduction d'échelle), puis `blit`ée centrée sur `self.pos`.
 
-4. Classe `Skyline`
+4. Classe `Explosion`
+---------------------
+Cette classe matérialise un effet d'explosion court mais expressif à chaque impact.
+
+* **Construction** — À la création, une dizaine de particules sont générées avec position (`Vector2`), vitesse initiale
+aléatoire, rayon de départ et couleur chaude. L'effet possède une durée fixe (~0,7 s) stockée dans `self.duration`.
+* **`update(dt)`** — Déplace les particules (`pos += vel * dt`), amortit leurs vitesses (`vel *= 0.9`), dilate le rayon (`radius += grow * dt`) et incrémente `self.time` pour savoir quand supprimer l'explosion.
+* **`draw(surface)`** — Commence par peindre un halo (surface temporaire en `SRCALPHA` avec deux disques concentriques dont
+l'opacité décroît), puis dessine chaque particule comme un petit disque semi-transparent pondéré par `fade = 1 - time/duration`.
+Résultat : un flash central lumineux avec quelques étincelles dispersées.
+
+5. Classe `Skyline`
 -------------------
-`Skyline` gère l'environnement destructible et la logique de collision fine.
+`Skyline` gère les immeubles destructibles et fait office de collision map.
 
-* **Attributs internes** — `surface` (le calque off-screen contenant la ville), `buildings` (liste des `pygame.Rect` des immeubles)
-  et `gorilla_spots` (points utilisables pour placer les gorilles). Centraliser ces données évite de recalculer la géométrie.
+* **Attributs** — `surface` (calque hors écran), `buildings` (liste de `pygame.Rect` représentant les immeubles),
+`gorilla_spots` (coordonnées des toits aptes à accueillir un gorille).
 * **`generate()`** —
-  1. crée une nouvelle surface transparente de la taille de l'écran ;
-  2. remplit la ville d'immeubles aux largeurs aléatoires, en variant légèrement la teinte bleue et la hauteur ;
-  3. enregistre la position de toits suffisamment larges pour accueillir un gorille. Ces spots alimentent `_place_gorillas()`.
-  Cette génération procédurale renouvelle le gameplay à chaque round.
-* **`draw(surface)`** — `blit` direct de la surface vers l'écran principal. Le coût est constant, quelle que soit la complexité
-  de la skyline générée.
-* **`carve_explosion(center, radius)`** — Dessine un disque transparent dans la surface, ce qui "creuse" les immeubles. Le
-  rayon provient de la constante `EXPLOSION_RADIUS` pour harmoniser dégâts visuels et gameplay.
-* **`collides(point)`** — Lit le pixel correspondant via `surface.get_at`. Si son alpha est supérieur à zéro, cela signifie que
-  la banane touche un bâtiment non détruit. Cette technique d'échantillonnage pixel-precise évite de gérer un maillage complexe.
+  1. crée une surface transparente de taille écran ;
+  2. dessine des immeubles de largeurs/hauteurs aléatoires, chacun avec une variation subtile de couleur et des fenêtres stylisées ;
+  3. remplit `gorilla_spots` avec des rectangles suffisamment larges sur lesquels on peut poser les personnages.
+* **`draw(surface)`** — `blit` direct de la surface préparée, ce qui rend la skyline en O(1) malgré la complexité visuelle.
+* **`carve_explosion(center, radius)`** — Dessine un cercle transparent (mode effacement) dans la surface pour simuler un
+impact qui creuse les immeubles.
+* **`collides(point)`** — Lit la couleur du pixel `surface.get_at((x, y))`. Si l'alpha > 0, on considère qu'un bâtiment solide
+est touché. Cette méthode évite d'avoir à gérer des boîtes de collision complexes.
 
-5. Orchestrateur `GorillaGame`
+6. Orchestrateur `GorillaGame`
 ------------------------------
-`GorillaGame` regroupe tout ce qui n'appartient pas explicitement aux entités précédentes : état des rounds, interface graphique,
-logique d'entrée utilisateur et rendu final. Pour clarifier, on peut diviser ses responsabilités en cinq sous-chapitres.
+`GorillaGame` est le cœur applicatif. Il maintient l'état du match, orchestre la boucle de jeu, la simulation et l'interface.
 
-### 5.1 Construction et dépendances
-Le constructeur reçoit `screen` (surface principale) et `ui_manager`. Il enchaîne plusieurs étapes :
+### 6.1 Initialisation
+Le constructeur reçoit `screen` et `ui_manager`. Il procède comme suit :
 
-1. `_build_sky()` — Prépare un arrière-plan dégradé bleu/orange pré-rendu (Surface). Ce choix améliore les performances en
-   évitant de recalculer le gradient chaque frame.
-2. `_build_ui()` — Installe les panneaux `pygame_gui` :
-   * `names_panel` (deux `UITextEntryLine`) stockés dans `self.name_inputs` ;
-   * `throw_panel` qui mélange `UILabel`, `UITextEntryLine` pour l'angle/la vitesse et un `UIButton` "Lancer" ;
-   * `status_panel` muni d'un `UITextBox` défilant pour afficher instructions et résultats ;
-   * `status_label` au sommet de l'écran (HUD). Cette redondance assure qu'une information critique est visible même si le
-     panneau est masqué derrière la fenêtre de jeu.
-3. Instanciation de `Skyline`, `Gorilla` (un à gauche, un à droite), compteurs de victoires (`scores` dictionnaire) et variables
-   de tour (`current_player`, `projectile`, `wind`).
-4. Appel immédiat à `start_match()` afin de générer le premier round sans interaction supplémentaire.
+1. `_build_sky()` — Prérend un dégradé vertical bleu/orange sur une surface. Cela évite de recalculer le gradient à chaque frame.
+2. `_build_ui()` — Crée les panneaux `pygame_gui` :
+   * `names_panel` avec deux `UITextEntryLine` pour saisir les pseudos (stockés dans `self.name_inputs`).
+   * `throw_panel` contenant deux champs numériques (angle/vitesse), des labels, un bouton « Lancer » et un indicateur du vent.
+   * `status_panel` avec un `UITextBox` pour afficher instructions et messages de fin de round.
+   * `status_label` en haut de l'écran servant de HUD rapide.
+3. Instancie `Skyline`, deux `Gorilla` (gauche/droite), les compteurs de victoires (`self.scores = {0: 0, 1: 0}`), les variables
+de tour (`current_player`, `projectile`, `wind`) et la liste `self.explosions`.
+4. Appelle `start_match()` afin que la première partie commence immédiatement.
 
-### 5.2 Cycle de vie des rounds
-`start_match()` remet les scores à zéro, réinitialise les messages de statut et appelle `start_round()`. Cette dernière effectue :
+### 6.2 Gestion des rounds
+* **`start_match()`** — Réinitialise les scores, efface le texte d'état, remet `current_player` à 0 et enchaîne sur
+  `start_round()`.
+* **`start_round()`** — Génère une nouvelle ville (`skyline.generate()`), place les gorilles sur deux toits éloignés via
+  `_place_gorillas()`, tire un vent aléatoire `[-WIND_MAX, WIND_MAX]`, alterne le premier joueur (simple flip binaire) et efface
+  l'ancien projectile. Un message d'état décrit le vent et le joueur actif.
 
-* `skyline.generate()` pour renouveler la ville ;
-* `_place_gorillas()` qui choisit deux spots distants (un proche de la gauche, l'autre de la droite) en garantissant une marge de
-  sécurité minimale ;
-* tirage aléatoire d'une valeur de vent dans `[-WIND_MAX, WIND_MAX]` ;
-* sélection du joueur qui commence (alternance simple) ;
-* effacement de `projectile` pour éviter qu'une banane précédente continue de voler.
+### 6.3 Boucle principale et entrées
+* **`run()`** — Boucle `while self.running`. Traitement des événements :
+  * `QUIT` → `self.running = False` ;
+  * `KEYDOWN` sur `K_r` → `start_match()` (reboot instantané, tel que demandé par l'utilisateur) ;
+  * `UI_BUTTON_PRESSED` sur le bouton « Lancer » → `handle_fire()` ;
+  * tous les événements sont transmis au `ui_manager`.
+  Ensuite, `dt = clock.tick(60) / 1000.0`, suivi de `update(dt)`, `draw()` et `ui_manager.draw_ui(self.screen)`.
+* **`handle_fire()`** — Lit l'angle et la vitesse dans les champs texte, tente une conversion float, valide (0 < angle < 180 et
+vitesse > 0). En cas d'erreur, `update_status()` affiche un message. Sinon, la méthode construit un `Projectile` à partir de la
+position donnée par `current_gorilla.throw_position()` et l'associe au vent courant.
 
-Les gorilles sont stockés dans `self.gorillas = [gorilla_left, gorilla_right]`. La variable `current_player` contient l'indice
-(0 ou 1), ce qui simplifie l'accès à la structure en permanence.
+### 6.4 Simulation et collisions
+* **`update(dt)`** —
+  1. Met à jour les explosions existantes (suppression lorsqu'elles expirent).
+  2. Si `self.projectile` est actif, appelle `projectile.update(dt)` puis teste :
+     * sorties d'écran (gauche/droite/bas) → `switch_turn("La banane est sortie...")` ;
+     * collision skyline (`skyline.collides`) → `skyline.carve_explosion`, `spawn_explosion`, `switch_turn` ;
+     * collision gorille adverse (`gorilla.rect.collidepoint`) → `spawn_explosion`, `resolve_hit()`.
+* **`spawn_explosion(pos)`** — Ajoute une instance d'`Explosion` centrée sur `pos`.
+* **`_place_gorillas()`** — Sélectionne deux toits distants pour placer les `rect` des gorilles (hauteur ajustée pour que les pieds
+reposent sur le toit).
 
-### 5.3 Gestion des entrées et boucle principale
-* **`run()`** — Contient la boucle `while self.running`. Elle traite les événements `pygame`: 
-  * `QUIT` ferme proprement,
-  * `KEYDOWN` sur `K_r` déclenche `start_match()` pour respecter la consigne « appuyer sur R pour redémarrer »,
-  * événements `UI_BUTTON_PRESSED` sur le bouton "Lancer" déclenchent `handle_fire()`.
-  Après la gestion des événements, la méthode calcule `dt = clock.tick(60) / 1000.0`, appelle `update(dt)`, puis `draw()`. Enfin,
-  `ui_manager.update(dt)` maintient les animations de l'interface.
-* **`handle_fire()`** — Lit les champs texte, tente de convertir en float et valide : angle ∈ (0, 180), vitesse > 0. Si les
-  conditions sont satisfaites, la méthode calcule `origin = gorilla.throw_position()` puis crée `Projectile`. En cas de valeur
-  invalide, elle informe l'utilisateur par `update_status()` sans crasher la boucle.
+### 6.5 Gestion des tours et des scores
+* **`switch_turn(message)`** — Passe de 0 à 1 (ou inversement) via `self.current_player = 1 - self.current_player`, remet
+`self.projectile = None`, publie le message et informe le panneau de statut. Empêche le spam tant qu'un projectile existe.
+* **`resolve_hit(winner_idx, loser_idx)`** — Incrémente `self.scores[winner_idx]`, affiche un texte avec les pseudos (ou
+"Joueur 1/2" si vide). Si le gagnant atteint `WIN_ROUNDS`, sauvegarde le match (`save_score`) puis relance `start_match()`.
+Sinon, relance simplement `start_round()`.
+* **`save_score(winner_idx, loser_idx)`** — Construit un dictionnaire : timestamp ISO, noms des joueurs, vainqueur, perdant,
+score final. Lit `scores.json` si présent (liste d'entrées), ajoute l'élément et réécrit le fichier. Ce mécanisme persiste
+l'historique des parties pour consultation ultérieure.
 
-### 5.4 Simulation et détection de collisions
-`update(dt)` s'active uniquement lorsqu'un projectile existe. Son pipeline est :
+### 6.6 Rendu haut niveau
+* **`_draw_hud()`** — Affiche en haut d'écran : pseudos, score des rounds, information de vent (flèche orientée selon le signe et
+valeur numérique), rappel « R : redémarrer ». Utilise la police partagée pour garder la cohérence graphique.
+* **`draw()`** — Ordonne le rendu : ciel → skyline → explosions (halo derrière) → gorilles → projectile (traînée + banane) → HUD →
+UI `pygame_gui`. Le respect de cette pile assure que les éléments critiques restent visibles et cliquables.
 
-1. `self.projectile.update(dt)` pour avancer la banane.
-2. Vérification des bornes d'écran (`pos.x < 0`, `pos.x > width`, `pos.y > height`). En dehors des limites, la banane est
-   détruite et `switch_turn("La banane est sortie de l'écran…")` est appelé.
-3. Collision avec la skyline : si `skyline.collides(projectile.pos)` retourne vrai, alors
-   * `skyline.carve_explosion(projectile.pos, EXPLOSION_RADIUS)` pour visuel + modification physique ;
-   * `switch_turn("Impact sur un immeuble…")`.
-4. Collision avec les gorilles : pour chaque gorille adverse, on teste l'intersection entre le point et `gorilla.rect`. En cas de
-   succès, `resolve_hit(winner, loser)` gère la suite.
-
-Cette séquence montre comment la classe centralise toute la logique d'interaction sans disperser les collisions dans plusieurs
-fichiers.
-
-### 5.5 Gestion des tours et scoring
-* **`switch_turn(message)`** — Change `current_player` en `1 - current_player`, remet `projectile = None` et publie `message` via
-  `update_status`. La condition préliminaire `if self.projectile is None` évite qu'un joueur spamme le bouton pendant qu'une
-  banane est déjà en vol.
-* **`resolve_hit(winner, loser)`** — Incrémente `scores[winner]`, affiche le résultat, puis :
-  * si `scores[winner] >= WIN_ROUNDS`, appelle `save_score()` puis `start_match()` (nouveau match complet) ;
-  * sinon, relance simplement `start_round()`.
-  Les paramètres `winner`/`loser` sont des indices (0/1), ce qui permet de réutiliser `player_name(idx)` pour personnaliser les
-  messages.
-* **`save_score(winner, loser)`** — Assemble un dictionnaire `{ "timestamp": ..., "winner": ..., "loser": ..., "scores": ... }`,
-  lit le fichier JSON existant (s'il existe) puis ajoute l'entrée avant de réécrire le tout. Les exceptions d'E/S sont traitées
-  implicitement par Python ; dans le cadre du projet pédagogique, on suppose que le dossier est accessible en écriture.
-
-### 5.6 Rendu haute couche
-* **`_draw_hud()`** — Affiche sur une bande supérieure : noms/pseudos (ou "Joueur 1/2" si champs vides), score de rounds,
-  intensité du vent (flèche orientée à droite si `wind > 0`, gauche sinon) et rappel « R : redémarrer ». Ce HUD est redessiné à
-  chaque frame pour rester synchronisé avec les variables.
-* **`draw()`** — Compose la scène dans un ordre fixe : ciel → skyline → gorilles → projectile (s'il existe) → HUD → UI.
-  Respecter cet ordre garantit que :
-  1. la skyline recouvre le ciel ;
-  2. les gorilles apparaissent devant les immeubles ;
-  3. la traînée de banane reste visible ;
-  4. l'interface utilisateur (textboxes/boutons) reste cliquable au-dessus de tout.
-
-6. Fonction `main()` et point d'entrée
+7. Fonction `main()` et point d'entrée
 -------------------------------------
-`main()` est la glue système. Elle se charge de :
+`main()` encapsule l'initialisation système :
 
-1. `pygame.init()` et création de la fenêtre `SCREEN_SIZE` ;
-2. instanciation du `UIManager` (obligatoire pour `pygame_gui`) avec le même viewport ;
+1. `pygame.init()` puis création de la fenêtre `SCREEN_SIZE` ;
+2. instanciation du `UIManager` associé ;
 3. création de `GorillaGame(screen, manager)` ;
-4. appel à `game.run()` ;
-5. `pygame.quit()` à la sortie pour libérer les ressources SDL.
+4. appel à `game.run()` pour démarrer la boucle ;
+5. `pygame.quit()` à la fin pour libérer proprement les ressources SDL.
 
-Le bloc final `if __name__ == "__main__": main()` autorise deux usages :
-* Exécution directe (`python app.py`) pour jouer.
-* Importation du module dans des tests unitaires ou des scripts d'analyse sans lancer la boucle graphique, ce qui facilite le
-  prototypage d'améliorations.
+Le bloc `if __name__ == "__main__": main()` permet d'exécuter directement le jeu ou d'importer `app.py` sans lancer la
+boucle (utile pour tests unitaires ou analyses).
 
 Conclusion
 ----------
-Le fichier `app.py` articule clairement trois niveaux : entités (gorille, projectile, skyline), orchestrateur (`GorillaGame`) et
-boilerplate système (`main`). Chaque méthode a été documentée ici avec ses entrées, ses effets et sa contribution au flux
-général. Cette lecture permet de justifier les choix techniques lors d'une soutenance de projet ou d'un mémoire, en insistant sur
-l'intégration entre simulation physique, rendu pygame et interface `pygame_gui`.
+Le fichier `app.py` se décompose donc en briques clairement identifiées : entités (gorilles, bananes, explosions, skyline),
+contrôleur (`GorillaGame`) et couche système (`main`). Ce mémo détaille chaque méthode, ses entrées, ses effets et ses
+interactions, fournissant une base solide pour défendre le projet lors d'une soutenance ou d'un rapport de mémoire.
