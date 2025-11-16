@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Gorilla 2025 - QBasic Gorillas revisité en pygame."""
 from __future__ import annotations
 
@@ -82,7 +83,11 @@ class Projectile:
     def draw(self, surface: pygame.Surface) -> None:
         for idx, point in enumerate(self.trail):
             alpha = int(255 * (idx / len(self.trail))) if self.trail else 0
-            color = (255, 230 - alpha // 2, 80 - alpha // 3)
+            color = (
+                255,
+                max(0, min(255, 230 - alpha // 2)),
+                max(0, min(255, 80 - alpha // 3)),
+            )
             pygame.draw.circle(surface, color, (int(point.x), int(point.y)), 3)
         pygame.draw.circle(surface, (255, 248, 150), (int(self.pos.x), int(self.pos.y)), 6)
 
@@ -270,7 +275,7 @@ class GorillaGame:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_r and self.match_over:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
                     self.start_match()
                 if event.type == pygame.USEREVENT and event.user_type == pygame_gui.UI_BUTTON_PRESSED:
                     if event.ui_element == self.fire_button:
