@@ -177,18 +177,46 @@ class Projectile:
     @classmethod
     def _get_banana_surface(cls) -> pygame.Surface:
         if cls._banana_surface is None:
-            surf = pygame.Surface((44, 20), pygame.SRCALPHA)
-            base_color = pygame.Color(250, 230, 90)
-            shadow = pygame.Color(205, 170, 50)
-            highlight = pygame.Color(255, 255, 180)
-            curve_rect = pygame.Rect(4, 2, 32, 16)
-            pygame.draw.ellipse(surf, base_color, curve_rect)
-            inner_rect = curve_rect.inflate(-10, -6)
-            inner_rect.move_ip(4, 0)
-            pygame.draw.ellipse(surf, highlight, inner_rect)
-            pygame.draw.arc(surf, shadow, curve_rect.inflate(6, 4), math.pi / 4, math.pi - math.pi / 6, 3)
-            pygame.draw.circle(surf, shadow, (curve_rect.left + 4, curve_rect.centery + 4), 3)
-            pygame.draw.circle(surf, shadow, (curve_rect.right - 6, curve_rect.centery - 4), 3)
+            surf = pygame.Surface((80, 60), pygame.SRCALPHA)
+            base_color = pygame.Color(252, 222, 92)
+            shadow = pygame.Color(186, 142, 52)
+            highlight = pygame.Color(255, 248, 196)
+
+            center = pygame.Vector2(34, 40)
+            outer_radius = 34
+            inner_radius = 18
+            outer_points: List[Tuple[int, int]] = []
+            inner_points: List[Tuple[int, int]] = []
+            for deg in range(-125, 55, 5):
+                rad = math.radians(deg)
+                point = center + pygame.Vector2(math.cos(rad), math.sin(rad)) * outer_radius
+                outer_points.append((int(point.x), int(point.y)))
+            for deg in range(55, -125, -5):
+                rad = math.radians(deg)
+                offset = pygame.Vector2(math.cos(rad), math.sin(rad)) * inner_radius
+                point = center + offset + pygame.Vector2(4, -4)
+                inner_points.append((int(point.x), int(point.y)))
+            banana_shape = outer_points + inner_points
+            pygame.draw.polygon(surf, base_color, banana_shape)
+
+            highlight_points: List[Tuple[int, int]] = []
+            for deg in range(-110, 40, 6):
+                rad = math.radians(deg)
+                point = center + pygame.Vector2(math.cos(rad), math.sin(rad)) * (inner_radius - 3)
+                point += pygame.Vector2(0, -8)
+                highlight_points.append((int(point.x), int(point.y)))
+            pygame.draw.lines(surf, highlight, False, highlight_points, 5)
+
+            pygame.draw.arc(
+                surf,
+                shadow,
+                pygame.Rect(6, 8, 60, 44),
+                math.radians(-140),
+                math.radians(40),
+                6,
+            )
+            pygame.draw.circle(surf, shadow, outer_points[0], 4)
+            pygame.draw.circle(surf, shadow, outer_points[-1], 3)
             cls._banana_surface = surf
         return cls._banana_surface
 
