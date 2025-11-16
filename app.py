@@ -137,12 +137,16 @@ class Gorilla:
 class Projectile:
     """Une banane explosive."""
 
+    _banana_surface: pygame.Surface | None = None
+
     def __init__(self, start_pos: pygame.Vector2, speed: float, angle_deg: float, wind_speed: float):
         self.pos = start_pos.copy()
         radians = math.radians(angle_deg)
         self.vel = pygame.Vector2(math.cos(radians) * speed, -math.sin(radians) * speed)
         self.wind_speed = wind_speed
         self.trail: List[pygame.Vector2] = []
+        self.rotation = random.uniform(0, 360)
+        self.rotation_speed = random.uniform(180, 320) * (1 if random.random() < 0.5 else -1)
 
     def update(self, dt: float) -> None:
         rel_vx = self.vel.x - self.wind_speed
@@ -154,6 +158,7 @@ class Projectile:
         self.trail.append(self.pos.copy())
         if len(self.trail) > 120:
             self.trail.pop(0)
+        self.rotation = (self.rotation + self.rotation_speed * dt) % 360
 
     def draw(self, surface: pygame.Surface) -> None:
         for idx, point in enumerate(self.trail):
@@ -164,7 +169,28 @@ class Projectile:
                 max(0, min(255, 80 - alpha // 3)),
             )
             pygame.draw.circle(surface, color, (int(point.x), int(point.y)), 3)
-        pygame.draw.circle(surface, (255, 248, 150), (int(self.pos.x), int(self.pos.y)), 6)
+        banana = self._get_banana_surface()
+        rotated = pygame.transform.rotozoom(banana, -self.rotation, 0.9)
+        rect = rotated.get_rect(center=(int(self.pos.x), int(self.pos.y)))
+        surface.blit(rotated, rect)
+
+    @classmethod
+    def _get_banana_surface(cls) -> pygame.Surface:
+        if cls._banana_surface is None:
+            surf = pygame.Surface((44, 20), pygame.SRCALPHA)
+            base_color = pygame.Color(250, 230, 90)
+            shadow = pygame.Color(205, 170, 50)
+            highlight = pygame.Color(255, 255, 180)
+            curve_rect = pygame.Rect(4, 2, 32, 16)
+            pygame.draw.ellipse(surf, base_color, curve_rect)
+            inner_rect = curve_rect.inflate(-10, -6)
+            inner_rect.move_ip(4, 0)
+            pygame.draw.ellipse(surf, highlight, inner_rect)
+            pygame.draw.arc(surf, shadow, curve_rect.inflate(6, 4), math.pi / 4, math.pi - math.pi / 6, 3)
+            pygame.draw.circle(surf, shadow, (curve_rect.left + 4, curve_rect.centery + 4), 3)
+            pygame.draw.circle(surf, shadow, (curve_rect.right - 6, curve_rect.centery - 4), 3)
+            cls._banana_surface = surf
+        return cls._banana_surface
 
 
 class Skyline:
