@@ -35,22 +35,97 @@ class Gorilla:
     direction: int  # +1 vers la droite, -1 vers la gauche
 
     def draw(self, surface: pygame.Surface) -> None:
-        body_rect = pygame.Rect(self.rect.x, self.rect.y + 10, self.rect.width, self.rect.height - 10)
-        pygame.draw.rect(surface, self.color, body_rect, border_radius=8)
-        head_center = (self.rect.centerx, self.rect.y + 8)
-        pygame.draw.circle(surface, (255, 220, 193), head_center, self.rect.width // 3)
-        eye_offset = 6
+        body_rect = pygame.Rect(self.rect.x, self.rect.y + 8, self.rect.width, self.rect.height - 8)
+        head_center = (self.rect.centerx, self.rect.y + 12)
+
+        def lighten(color: Tuple[int, int, int], value: int) -> Tuple[int, int, int]:
+            return tuple(min(255, c + value) for c in color)
+
+        def darken(color: Tuple[int, int, int], value: int) -> Tuple[int, int, int]:
+            return tuple(max(0, c - value) for c in color)
+
+        fur_color = self.color
+        belly_color = lighten(self.color, 60)
+        shadow_color = darken(self.color, 35)
+        muzzle_color = (242, 210, 166)
+
+        pygame.draw.ellipse(surface, fur_color, body_rect)
+        belly_rect = body_rect.inflate(-int(self.rect.width * 0.3), -int(self.rect.height * 0.25))
+        pygame.draw.ellipse(surface, belly_color, belly_rect)
+
+        head_radius = self.rect.width // 3
+        pygame.draw.circle(surface, fur_color, head_center, head_radius)
+
+        ear_offset = head_radius + 2
+        ear_radius = max(4, head_radius // 2)
+        ear_y = head_center[1] - 4
+        pygame.draw.circle(surface, fur_color, (head_center[0] - ear_offset, ear_y), ear_radius)
+        pygame.draw.circle(surface, fur_color, (head_center[0] + ear_offset, ear_y), ear_radius)
+        pygame.draw.circle(surface, belly_color, (head_center[0] - ear_offset, ear_y), ear_radius - 2)
+        pygame.draw.circle(surface, belly_color, (head_center[0] + ear_offset, ear_y), ear_radius - 2)
+
+        muzzle_rect = pygame.Rect(0, 0, head_radius * 2, head_radius * 1.4)
+        muzzle_rect.center = (head_center[0], head_center[1] + 4)
+        pygame.draw.ellipse(surface, muzzle_color, muzzle_rect)
+
+        eye_offset = 7
         eye_radius = 3
-        pygame.draw.circle(surface, (0, 0, 0), (head_center[0] - eye_offset, head_center[1] - 2), eye_radius)
-        pygame.draw.circle(surface, (0, 0, 0), (head_center[0] + eye_offset, head_center[1] - 2), eye_radius)
-        arm_y = self.rect.y + 18
-        arm_length = 14
+        eye_y = head_center[1] - 2
+        pygame.draw.circle(surface, (0, 0, 0), (head_center[0] - eye_offset, eye_y), eye_radius)
+        pygame.draw.circle(surface, (0, 0, 0), (head_center[0] + eye_offset, eye_y), eye_radius)
+
+        nose_center = (head_center[0], head_center[1] + 2)
+        pygame.draw.circle(surface, (90, 58, 40), nose_center, 2)
+        pygame.draw.arc(
+            surface,
+            (80, 45, 25),
+            pygame.Rect(head_center[0] - 10, head_center[1] + 6, 20, 12),
+            math.pi / 10,
+            math.pi - math.pi / 10,
+            2,
+        )
+
+        arm_y = self.rect.y + 28
+        arm_length = 18
+        hand_offset = pygame.Vector2(self.direction * arm_length, -6)
         pygame.draw.line(
             surface,
-            (40, 28, 25),
+            shadow_color,
+            (self.rect.centerx - self.direction * 4, arm_y),
+            (self.rect.centerx - self.direction * 4, arm_y + 14),
+            5,
+        )
+        pygame.draw.line(
+            surface,
+            shadow_color,
+            (self.rect.centerx + self.direction * 4, arm_y),
+            (self.rect.centerx + self.direction * 4, arm_y + 14),
+            5,
+        )
+        pygame.draw.line(
+            surface,
+            shadow_color,
             (self.rect.centerx, arm_y),
-            (self.rect.centerx + self.direction * arm_length, arm_y - 4),
+            (int(self.rect.centerx + hand_offset.x), int(arm_y + hand_offset.y)),
             4,
+        )
+
+        leg_rect = pygame.Rect(self.rect.x + 6, self.rect.bottom - 18, self.rect.width - 12, 16)
+        pygame.draw.ellipse(surface, shadow_color, leg_rect)
+
+        tail_start = (self.rect.centerx - self.direction * (self.rect.width // 2 - 4), self.rect.bottom - 18)
+        tail_points = [
+            tail_start,
+            (tail_start[0] - self.direction * 12, tail_start[1] - 8),
+            (tail_start[0] - self.direction * 20, tail_start[1] + 2),
+            (tail_start[0] - self.direction * 12, tail_start[1] + 12),
+        ]
+        pygame.draw.lines(
+            surface,
+            shadow_color,
+            False,
+            [(int(x), int(y)) for (x, y) in tail_points],
+            3,
         )
 
     def throw_position(self) -> pygame.Vector2:
