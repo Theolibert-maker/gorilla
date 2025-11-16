@@ -1,0 +1,22 @@
+[
+  {
+    "timestamp": "2025-11-16T12:32:48",
+    "winner": "Gorille A",
+    "loser": "Gorille B",
+    "rounds": {
+      "player_1": 2,
+      "player_2": 0
+    },
+    "wind": -85.49
+  },
+  {
+    "timestamp": "2025-11-16T13:18:11",
+    "winner": "Gorille A",
+    "loser": "Gorille B",
+    "rounds": {
+      "player_1": 2,
+      "player_2": 0
+    },
+    "wind": 130.25
+  }
+]
