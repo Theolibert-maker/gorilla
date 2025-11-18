@@ -125,7 +125,8 @@ de tour (`current_player`, `projectile`, `wind`) et la liste `self.explosions`.
   * tous les événements sont transmis au `ui_manager`.
   Ensuite, `dt = clock.tick(60) / 1000.0`, suivi de `update(dt)`, `draw()` et `ui_manager.draw_ui(self.screen)`.
 * **`handle_fire()`** — Lit l'angle et la vitesse dans les champs texte, tente une conversion float, valide (0 < angle < 180 et
-vitesse > 0). En cas d'erreur, `update_status()` affiche un message. Sinon, la méthode construit un `Projectile` à partir de la
+vitesse > 0). Désormais seule une borne basse de 60 px/s est appliquée (aucune limite haute), répondant à la demande de tirs
+« débridés ». En cas d'erreur, `update_status()` affiche un message. Sinon, la méthode construit un `Projectile` à partir de la
 position donnée par `current_gorilla.throw_position()` et l'associe au vent courant.
 
 ### 6.4 Simulation et collisions
@@ -151,7 +152,11 @@ l'historique des parties pour consultation ultérieure.
 
 ### 6.6 Rendu haut niveau
 * **`_draw_hud()`** — Affiche en haut d'écran : pseudos, score des rounds, information de vent (flèche orientée selon le signe et
-valeur numérique), rappel « R : redémarrer ». Utilise la police partagée pour garder la cohérence graphique.
+valeur numérique), rappel « R : redémarrer » ainsi que la nouvelle prévisualisation du tir courant.
+* **Prévisualisation angle/vitesse** — Deux aides privées se partagent la tâche : `_compute_shot_preview()` lit les champs
+« Angle » et « Vitesse », applique la même seule contrainte (60 px/s minimum, pas de plafond) et convertit l'angle pour le
+joueur de droite (180° - angle). `_draw_aim_indicator()` trace ensuite une flèche partant du bras du gorille actif, avec un
+texte `X° | Y px/s`. Cette flèche donne une idée immédiate du couple angle/vitesse saisi, et disparaît dès qu'un projectile est en vol.
 * **`draw()`** — Ordonne le rendu : ciel → skyline → explosions (halo derrière) → gorilles → projectile (traînée + banane) → HUD →
 UI `pygame_gui`. Le respect de cette pile assure que les éléments critiques restent visibles et cliquables.
 
