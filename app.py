@@ -478,7 +478,7 @@ class GorillaGame:
         if not (0 < angle < 180) or speed <= 0:
             self.update_status("Entrez un angle entre 0 et 180° et une vitesse positive.")
             return
-        speed = max(60.0, min(speed, 600.0))
+        speed = max(60.0, speed)
         if self.current_player == 1:
             angle = 180 - angle
         start_pos = self.gorillas[self.current_player].throw_position()
@@ -568,6 +568,59 @@ class GorillaGame:
         self.manager.draw_ui(self.screen)
         pygame.display.flip()
 
+    def _compute_shot_preview(self):
+        if not self.gorillas:
+            return None
+        if self.projectile is not None:
+            return None
+        try:
+            angle = float(self.angle_input.get_text())
+            speed = float(self.speed_input.get_text())
+        except ValueError:
+            return None
+        if not (0 < angle < 180) or speed <= 0:
+            return None
+        speed = max(60.0, speed)
+        adjusted_angle = angle if self.current_player == 0 else 180 - angle
+        radians = math.radians(adjusted_angle)
+        velocity = pygame.Vector2(math.cos(radians) * speed, -math.sin(radians) * speed)
+        if velocity.length_squared() == 0:
+            return None
+        origin = self.gorillas[self.current_player].throw_position()
+        return origin, velocity, adjusted_angle, speed
+
+    def _draw_aim_indicator(self, font: pygame.font.Font) -> None:
+        preview = self._compute_shot_preview()
+        if not preview:
+            return
+        origin, velocity, angle_value, speed_value = preview
+        direction = velocity.normalize()
+        scale = min(200, 0.35 * speed_value)
+        end = origin + direction * scale
+        color = (255, 224, 130)
+        start_pos = (int(origin.x), int(origin.y))
+        end_pos = (int(end.x), int(end.y))
+        pygame.draw.line(self.screen, color, start_pos, end_pos, 4)
+        tip = pygame.Vector2(end_pos)
+        perp = pygame.Vector2(-direction.y, direction.x)
+        arrow_tip = tip
+        left = arrow_tip - direction * 16 + perp * 6
+        right = arrow_tip - direction * 16 - perp * 6
+        pygame.draw.polygon(
+            self.screen,
+            color,
+            [
+                (int(arrow_tip.x), int(arrow_tip.y)),
+                (int(left.x), int(left.y)),
+                (int(right.x), int(right.y)),
+            ],
+        )
+        label = font.render(f"{int(angle_value)}° | {int(speed_value)} px/s", True, (255, 255, 255))
+        label_pos = arrow_tip + direction * 18
+        label_rect = label.get_rect(center=(int(label_pos.x), int(label_pos.y)))
+        label_rect.clamp_ip(self.screen.get_rect())
+        self.screen.blit(label, label_rect)
+
     def _draw_hud(self) -> None:
         font = pygame.font.SysFont("arial", 20)
         big_font = pygame.font.SysFont("arial", 28, bold=True)
@@ -600,6 +653,7 @@ class GorillaGame:
                 (arrow_tip[0] - 10 * direction, arrow_tip[1] + 6),
             ],
         )
+        self._draw_aim_indicator(font)
         hint_text = font.render("Terminez 2 rounds pour gagner. R pour recommencer.", True, (220, 220, 220))
         self.screen.blit(hint_text, (SCREEN_WIDTH - hint_text.get_width() - 20, SCREEN_HEIGHT - 160))
 
