@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
-"""Gorilla 2025 - QBasic Gorillas revisité en pygame."""
 from __future__ import annotations
 
 import json
 import math
 import random
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
@@ -15,7 +12,7 @@ import pygame_gui
 
 SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 720
-GRAVITY = 260.0  # px/s^2
+GRAVITY = 260.0
 DRAG_COEFF = 0.55
 EXPLOSION_RADIUS = 38
 MAX_WIND = 140.0
@@ -26,116 +23,87 @@ SKY_BOTTOM = (38, 77, 145)
 CITY_LIGHT = (229, 199, 126)
 
 
-@dataclass
 class Gorilla:
-    """Représente un gorille posé sur un immeuble."""
-
-    rect: pygame.Rect
-    color: Tuple[int, int, int]
-    direction: int  # +1 vers la droite, -1 vers la gauche
+    def __init__(self, rect: pygame.Rect, color: Tuple[int, int, int], direction: int):
+        self.rect = rect
+        self.color = color
+        self.direction = direction  # +1 droite, -1 gauche
 
     def draw(self, surface: pygame.Surface) -> None:
-        body_rect = pygame.Rect(self.rect.x, self.rect.y + 8, self.rect.width, self.rect.height - 8)
-        head_center = (self.rect.centerx, self.rect.y + 12)
+        fourrure, ventre, ombre = self._tonalites_fourrure()
+        tete = (self.rect.centerx, self.rect.y + 12)
 
-        def lighten(color: Tuple[int, int, int], value: int) -> Tuple[int, int, int]:
-            return tuple(min(255, c + value) for c in color)
+        corps = pygame.Rect(self.rect.x, self.rect.y + 8,
+                            self.rect.width, self.rect.height - 8)
+        self._dessiner_fourrure(surface, corps, fourrure, ventre)
+        self._dessiner_tete(surface, tete, fourrure, ventre)
+        self._dessiner_visage(surface, tete)
+        self._dessiner_bras(surface, ombre)
+        self._dessiner_jambes(surface, ombre)
+        self._dessiner_queue(surface, ombre, ventre)
 
-        def darken(color: Tuple[int, int, int], value: int) -> Tuple[int, int, int]:
-            return tuple(max(0, c - value) for c in color)
+    def _tonalites_fourrure(self):
+        fourrure = self.color
+        ventre = tuple(min(255, c + 60) for c in self.color)
+        ombre = tuple(max(0, c - 35) for c in self.color)
+        return fourrure, ventre, ombre
 
-        fur_color = self.color
-        belly_color = lighten(self.color, 60)
-        shadow_color = darken(self.color, 35)
-        muzzle_color = (242, 210, 166)
+    def _dessiner_fourrure(self, surface, corps, fourrure, ventre):
+        pygame.draw.ellipse(surface, fourrure, corps)
+        ventre_rect = corps.inflate(-int(self.rect.width * 0.3),
+                                    -int(self.rect.height * 0.25))
+        pygame.draw.ellipse(surface, ventre, ventre_rect)
 
-        pygame.draw.ellipse(surface, fur_color, body_rect)
-        belly_rect = body_rect.inflate(-int(self.rect.width * 0.3), -int(self.rect.height * 0.25))
-        pygame.draw.ellipse(surface, belly_color, belly_rect)
+    def _dessiner_tete(self, surface, centre_tete, fourrure, ventre):
+        rayon = self.rect.width // 3
+        pygame.draw.circle(surface, fourrure, centre_tete, rayon)
+        decal = rayon + 2
+        oreille = max(4, rayon // 2)
+        y = centre_tete[1] - 4
+        pygame.draw.circle(surface, fourrure, (centre_tete[0] - decal, y), oreille)
+        pygame.draw.circle(surface, fourrure, (centre_tete[0] + decal, y), oreille)
+        pygame.draw.circle(surface, ventre, (centre_tete[0] - decal, y), oreille - 2)
+        pygame.draw.circle(surface, ventre, (centre_tete[0] + decal, y), oreille - 2)
 
-        head_radius = self.rect.width // 3
-        pygame.draw.circle(surface, fur_color, head_center, head_radius)
+    def _dessiner_visage(self, surface, centre):
+        rayon = self.rect.width // 3
+        museau = pygame.Rect(0, 0, rayon * 2, int(rayon * 1.4))
+        museau.center = (centre[0], centre[1] + 4)
+        pygame.draw.ellipse(surface, (242, 210, 166), museau)
+        pygame.draw.circle(surface, (0, 0, 0), (centre[0] - 7, centre[1] - 2), 3)
+        pygame.draw.circle(surface, (0, 0, 0), (centre[0] + 7, centre[1] - 2), 3)
 
-        ear_offset = head_radius + 2
-        ear_radius = max(4, head_radius // 2)
-        ear_y = head_center[1] - 4
-        pygame.draw.circle(surface, fur_color, (head_center[0] - ear_offset, ear_y), ear_radius)
-        pygame.draw.circle(surface, fur_color, (head_center[0] + ear_offset, ear_y), ear_radius)
-        pygame.draw.circle(surface, belly_color, (head_center[0] - ear_offset, ear_y), ear_radius - 2)
-        pygame.draw.circle(surface, belly_color, (head_center[0] + ear_offset, ear_y), ear_radius - 2)
+    def _dessiner_bras(self, surface, ombre):
+        y = self.rect.y + 28
+        main = pygame.Vector2(self.direction * 18, -6)
+        pygame.draw.line(surface, ombre,
+                         (self.rect.centerx, y),
+                         (self.rect.centerx + main.x, y + main.y), 4)
 
-        muzzle_rect = pygame.Rect(0, 0, head_radius * 2, head_radius * 1.4)
-        muzzle_rect.center = (head_center[0], head_center[1] + 4)
-        pygame.draw.ellipse(surface, muzzle_color, muzzle_rect)
+    def _dessiner_jambes(self, surface, ombre):
+        jambe = pygame.Rect(self.rect.x + 6,
+                            self.rect.bottom - 18,
+                            self.rect.width - 12, 16)
+        pygame.draw.ellipse(surface, ombre, jambe)
 
-        eye_offset = 7
-        eye_radius = 3
-        eye_y = head_center[1] - 2
-        pygame.draw.circle(surface, (0, 0, 0), (head_center[0] - eye_offset, eye_y), eye_radius)
-        pygame.draw.circle(surface, (0, 0, 0), (head_center[0] + eye_offset, eye_y), eye_radius)
+    def _dessiner_queue(self, surface, ombre, ventre):
+        depart = pygame.Vector2(self.rect.centerx, self.rect.bottom - 16)
+        milieu = depart + pygame.Vector2(-self.direction * 16, -10)
+        pointe = milieu + pygame.Vector2(-self.direction * 12, 18)
+        pygame.draw.lines(surface, ombre, False,
+                          [depart, milieu, pointe], 4)
+        pygame.draw.circle(surface, ventre, pointe, 4)
 
-        nose_center = (head_center[0], head_center[1] + 2)
-        pygame.draw.circle(surface, (90, 58, 40), nose_center, 2)
-        pygame.draw.arc(
-            surface,
-            (80, 45, 25),
-            pygame.Rect(head_center[0] - 10, head_center[1] + 6, 20, 12),
-            math.pi / 10,
-            math.pi - math.pi / 10,
-            2,
+    def throw_position(self):
+        return pygame.Vector2(
+            self.rect.centerx + self.direction * (self.rect.width // 2 + 6),
+            self.rect.y + 12
         )
 
-        arm_y = self.rect.y + 28
-        arm_length = 18
-        hand_offset = pygame.Vector2(self.direction * arm_length, -6)
-        pygame.draw.line(
-            surface,
-            shadow_color,
-            (self.rect.centerx - self.direction * 4, arm_y),
-            (self.rect.centerx - self.direction * 4, arm_y + 14),
-            5,
-        )
-        pygame.draw.line(
-            surface,
-            shadow_color,
-            (self.rect.centerx + self.direction * 4, arm_y),
-            (self.rect.centerx + self.direction * 4, arm_y + 14),
-            5,
-        )
-        pygame.draw.line(
-            surface,
-            shadow_color,
-            (self.rect.centerx, arm_y),
-            (int(self.rect.centerx + hand_offset.x), int(arm_y + hand_offset.y)),
-            4,
-        )
-
-        leg_rect = pygame.Rect(self.rect.x + 6, self.rect.bottom - 18, self.rect.width - 12, 16)
-        pygame.draw.ellipse(surface, shadow_color, leg_rect)
-
-        tail_start = (self.rect.centerx - self.direction * (self.rect.width // 2 - 4), self.rect.bottom - 18)
-        tail_points = [
-            tail_start,
-            (tail_start[0] - self.direction * 12, tail_start[1] - 8),
-            (tail_start[0] - self.direction * 20, tail_start[1] + 2),
-            (tail_start[0] - self.direction * 12, tail_start[1] + 12),
-        ]
-        pygame.draw.lines(
-            surface,
-            shadow_color,
-            False,
-            [(int(x), int(y)) for (x, y) in tail_points],
-            3,
-        )
-
-    def throw_position(self) -> pygame.Vector2:
-        x = self.rect.centerx + self.direction * (self.rect.width // 2 + 6)
-        y = self.rect.y + 12
-        return pygame.Vector2(x, y)
 
 
 class Projectile:
-    """Une banane explosive."""
+    #Une banane explosive.
 
     _banana_surface: pygame.Surface | None = None
 
@@ -212,7 +180,7 @@ class Projectile:
 
 
 class Explosion:
-    """Effet visuel pour les impacts."""
+    #Effet visuel pour les impacts.
 
     def __init__(self, position: Tuple[int, int]):
         self.pos = pygame.Vector2(position)
@@ -271,7 +239,7 @@ class Explosion:
 
 
 class Skyline:
-    """Ville générée procéduralement, gère les collisions et les explosions."""
+    #Ville générée procéduralement, gère les collisions et les explosions.
 
     def __init__(self, width: int, height: int):
         self.width = width
@@ -312,7 +280,7 @@ class Skyline:
 
 
 class GorillaGame:
-    """Gestionnaire de la partie complète."""
+    #Gestionnaire de la partie complète.
 
     def __init__(self, screen: pygame.Surface, manager: pygame_gui.UIManager):
         self.screen = screen
@@ -327,6 +295,7 @@ class GorillaGame:
         self.round_wins = [0, 0]
         self.current_round = 1
         self.match_over = False
+        self.winner_name: str | None = None
         self.gorillas: List[Gorilla] = []
         self.status_message = ""
         self._build_ui()
@@ -405,6 +374,7 @@ class GorillaGame:
         self.round_wins = [0, 0]
         self.current_round = 1
         self.match_over = False
+        self.winner_name = None
         self.start_round()
 
     def start_round(self) -> None:
@@ -528,6 +498,7 @@ class GorillaGame:
         self.update_status(f"{winner_name} touche {loser_name} !")
         if self.round_wins[winner] >= 2:
             self.match_over = True
+            self.winner_name = winner_name
             self.projectile = None
             self.save_score(winner_name, loser_name)
             self.update_status(f"{winner_name} remporte la partie !\nAppuyez sur R pour rejouer.")
@@ -566,6 +537,8 @@ class GorillaGame:
             self.projectile.draw(self.screen)
         self._draw_hud()
         self.manager.draw_ui(self.screen)
+        if self.match_over:
+            self._draw_victory_screen()
         pygame.display.flip()
 
     def _compute_shot_preview(self):
@@ -656,6 +629,37 @@ class GorillaGame:
         self._draw_aim_indicator(font)
         hint_text = font.render("Terminez 2 rounds pour gagner. R pour recommencer.", True, (220, 220, 220))
         self.screen.blit(hint_text, (SCREEN_WIDTH - hint_text.get_width() - 20, SCREEN_HEIGHT - 160))
+
+    def _draw_victory_screen(self) -> None:
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 170))
+        self.screen.blit(overlay, (0, 0))
+
+        panel_rect = pygame.Rect(0, 0, 540, 260)
+        panel_rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        pygame.draw.rect(self.screen, (30, 26, 46), panel_rect, border_radius=12)
+        pygame.draw.rect(self.screen, (255, 223, 140), panel_rect, width=4, border_radius=12)
+
+        title_font = pygame.font.SysFont("arial", 40, bold=True)
+        font = pygame.font.SysFont("arial", 24)
+
+        winner = self.winner_name or "Vainqueur"
+        title = title_font.render(f"Victoire de {winner}!", True, (255, 223, 140))
+        title_rect = title.get_rect(center=(panel_rect.centerx, panel_rect.y + 55))
+        self.screen.blit(title, title_rect)
+
+        score_text = f"Score final : {self.player_name(0)} {self.round_wins[0]} - {self.round_wins[1]} {self.player_name(1)}"
+        score_surf = font.render(score_text, True, (235, 235, 235))
+        score_rect = score_surf.get_rect(center=(panel_rect.centerx, panel_rect.y + 115))
+        self.screen.blit(score_surf, score_rect)
+
+        hint = font.render("Appuyez sur R pour relancer une nouvelle partie", True, (210, 210, 210))
+        hint_rect = hint.get_rect(center=(panel_rect.centerx, panel_rect.y + 170))
+        self.screen.blit(hint, hint_rect)
+
+        footer = font.render("Les scores sont enregistrés dans scores.json", True, (170, 170, 170))
+        footer_rect = footer.get_rect(center=(panel_rect.centerx, panel_rect.y + 210))
+        self.screen.blit(footer, footer_rect)
 
     @staticmethod
     def _build_sky() -> pygame.Surface:
